@@ -1,12 +1,21 @@
-import React from 'react';
+import React, { useRef, useImperativeHandle, forwardRef } from 'react';
 
-const ChatInput = ({ 
+const ChatInput = forwardRef(({ 
   value, 
   onChange, 
   onSend, 
   disabled, 
   loading 
-}) => {
+}, ref) => {
+  const textareaRef = useRef(null);
+
+  // Expose focus method to parent components
+  useImperativeHandle(ref, () => ({
+    focus: () => {
+      textareaRef.current?.focus();
+    }
+  }));
+
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey && !disabled && !loading) {
       e.preventDefault();
@@ -19,6 +28,7 @@ const ChatInput = ({
       <div className="max-w-4xl mx-auto">
         <div className="relative flex items-center bg-[#40414f] rounded-lg shadow-lg border border-gray-700 focus-within:border-gray-600 transition-colors">
           <textarea
+            ref={textareaRef}
             rows="1"
             value={value}
             onChange={onChange}
@@ -63,7 +73,9 @@ const ChatInput = ({
       </div>
     </div>
   );
-};
+});
+
+ChatInput.displayName = 'ChatInput';
 
 export default ChatInput;
 

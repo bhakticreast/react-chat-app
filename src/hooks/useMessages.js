@@ -1,19 +1,34 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { messageService } from '../services/supabase';
 import { chatAPI } from '../services/api';
-import { RATE_LIMIT_COOLDOWN } from '../constants/config';
 
-export const useMessages = (currentConversationId, updateConversationTitle) => {
+const MIN_REQUEST_INTERVAL = 1000; // 1 second between requests (smart rate limiting)
+
+export const useMessages = (
+  currentConversationId, 
+  setCurrentConversationId,
+  updateConversationTitle, 
+  createNewConversation
+) => {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [lastRequestTime, setLastRequestTime] = useState(0);
+  const lastRequestTimeRef = useRef(0);
+  const isSendingRef = useRef(false);
+  const previousConversationIdRef = useRef(currentConversationId);
 
   useEffect(() => {
-    if (currentConversationId) {
+    // Only load messages if we're not in the middle of sending a message
+    // and the conversation ID actually changed
+    if (currentConversationId && 
+        currentConversationId !== previousConversationIdRef.current && 
+        !isSendingRef.current) {
       loadMessages(currentConversationId);
-    } else {
+      // Reset rate limit when switching conversations
+      lastRequestTimeRef.current = 0;
+    } else if (!currentConversationId) {
       setMessages([]);
     }
+    previousConversationIdRef.current = currentConversationId;
   }, [currentConversationId]);
 
   const loadMessages = async (conversationId) => {
@@ -26,15 +41,35 @@ export const useMessages = (currentConversationId, updateConversationTitle) => {
   };
 
   const sendMessage = async (input) => {
-    if (!input.trim() || !currentConversationId) return;
+    if (!input.trim() || loading) return;
 
-    // Rate limit check
+    // Smart rate limiting - prevent rapid-fire requests
     const now = Date.now();
-    if (now - lastRequestTime < RATE_LIMIT_COOLDOWN) {
-      const remainingTime = Math.ceil((RATE_LIMIT_COOLDOWN - (now - lastRequestTime)) / 1000);
-      const errorMsg = `Rate limit exceeded. Please wait ${remainingTime} seconds.`;
-      setMessages(prev => [...prev, { role: 'assistant', content: errorMsg }]);
+    const timeSinceLastRequest = now - lastRequestTimeRef.current;
+    if (timeSinceLastRequest < MIN_REQUEST_INTERVAL) {
+      const waitTime = Math.ceil((MIN_REQUEST_INTERVAL - timeSinceLastRequest) / 1000);
+      console.warn(`Please wait ${waitTime} second(s) before sending another message.`);
       return;
+    }
+
+    // Update last request time immediately (before API call)
+    lastRequestTimeRef.current = now;
+    
+    // Mark that we're sending a message to prevent race conditions
+    isSendingRef.current = true;
+
+    // Create conversation if it doesn't exist (lazy creation)
+    let conversationId = currentConversationId;
+    if (!conversationId) {
+      conversationId = await createNewConversation();
+      if (!conversationId) {
+        console.error('Failed to create conversation');
+        isSendingRef.current = false;
+        return;
+      }
+      // Update the ref to prevent loading messages
+      previousConversationIdRef.current = conversationId;
+      // Note: createNewConversation already calls setCurrentConversationId internally
     }
 
     const userMessage = { role: 'user', content: input };
@@ -43,18 +78,17 @@ export const useMessages = (currentConversationId, updateConversationTitle) => {
 
     // Save user message to database
     try {
-      await messageService.create(currentConversationId, 'user', input);
+      await messageService.create(conversationId, 'user', input);
 
-      // Update conversation title if it's the first message
+      // Update conversation title with first message
       if (messages.length === 0) {
-        await updateConversationTitle(currentConversationId, input);
+        await updateConversationTitle(conversationId, input);
       }
     } catch (error) {
       console.error('Error saving user message:', error);
     }
 
     setLoading(true);
-    setLastRequestTime(now);
 
     try {
       const content = await chatAPI.sendMessage(updatedMessages);
@@ -67,7 +101,7 @@ export const useMessages = (currentConversationId, updateConversationTitle) => {
       setMessages(prev => [...prev, botMessage]);
 
       // Save assistant message to database
-      await messageService.create(currentConversationId, 'assistant', content);
+      await messageService.create(conversationId, 'assistant', content);
 
     } catch (error) {
       console.error('Error:', error);
@@ -78,6 +112,7 @@ export const useMessages = (currentConversationId, updateConversationTitle) => {
       setMessages(prev => [...prev, errorMessage]);
     } finally {
       setLoading(false);
+      isSendingRef.current = false;
     }
   };
 

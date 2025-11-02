@@ -1,13 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, forwardRef } from 'react';
 import MessageList from './MessageList';
 import ChatInput from './ChatInput';
 
-const ChatArea = ({ 
+const ChatArea = forwardRef(({ 
   messages, 
   loading, 
-  onSendMessage, 
-  currentConversationId 
-}) => {
+  onSendMessage
+}, ref) => {
   const [input, setInput] = useState('');
 
   const handleSend = () => {
@@ -21,15 +20,18 @@ const ChatArea = ({
     <div className="flex-1 flex flex-col">
       <MessageList messages={messages} loading={loading} />
       <ChatInput
+        ref={ref}
         value={input}
         onChange={(e) => setInput(e.target.value)}
         onSend={handleSend}
-        disabled={!currentConversationId}
+        disabled={false}
         loading={loading}
       />
     </div>
   );
-};
+});
+
+ChatArea.displayName = 'ChatArea';
 
 export default ChatArea;
 
