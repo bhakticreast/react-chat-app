@@ -154,6 +154,7 @@ function App() {
           ],
           max_tokens: 500,
           temperature: 0.7,
+          disable_search: true
         },
         {
           headers: {
