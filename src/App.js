@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 import ReactMarkdown from 'react-markdown';
 import { createClient } from '@supabase/supabase-js';
+import { sendChatMessage } from './services/Api';
 import './App.css';
 // Initialize Supabase client
 const supabase = createClient(
@@ -140,32 +140,25 @@ function App() {
     setLastRequestTime(now);
 
     try {
-      // Send full conversation history for context
-      const response = await axios.post(
-        'https://api.perplexity.ai/chat/completions',
-        {
-          model: 'sonar',
-          messages: [
-            {
-              role: 'system',
-              content: 'You are a helpful, friendly AI assistant. Respond naturally to greetings and casual conversation. When users ask specific questions, provide informative answers based on current information.'
-            },
-            ...updatedMessages
-          ],
-          max_tokens: 500,
-          temperature: 0.7,
-        },
-        {
-          headers: {
-            'Authorization': `Bearer ${process.env.REACT_APP_OPENAI_API_KEY}`,
-            'Content-Type': 'application/json',
+      // Send full conversation history for context using API route
+      const botContent = await sendChatMessage({
+        model: 'sonar',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a helpful AI assistant in a chat application. Provide helpful, friendly, and conversational responses. Keep responses concise but informative.'
           },
-        }
-      );
+          ...updatedMessages.slice(-10)
+        ],
+        max_tokens: 500,
+        temperature: 0.7,
+        disable_search: true,
+        apiKey: process.env.REACT_APP_OPENAI_API_KEY
+      });
 
       const botMessage = {
         role: 'assistant',
-        content: response.data.choices[0].message.content
+        content: botContent
       };
 
       setMessages(prev => [...prev, botMessage]);
@@ -260,7 +253,7 @@ function App() {
             disabled={loading || !currentConversationId}
             title="Send"
           >
-            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" transform="rotate(-45)matrix(-1, 0, 0, -1, 0, 0)"><g id="SVGRepo_bgCarrier" stroke-width="0"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g><g id="SVGRepo_iconCarrier"> <path d="M14.4376 15.3703L12.3042 19.5292C11.9326 20.2537 10.8971 20.254 10.525 19.5297L4.24059 7.2971C3.81571 6.47007 4.65077 5.56156 5.51061 5.91537L18.5216 11.2692C19.2984 11.5889 19.3588 12.6658 18.6227 13.0704L14.4376 15.3703ZM14.4376 15.3703L5.09594 6.90886" stroke="#000000" stroke-width="2" stroke-linecap="round"></path> </g></svg>
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" transform="rotate(-45)matrix(-1, 0, 0, -1, 0, 0)"><g id="SVGRepo_bgCarrier" strokeWidth="0"></g><g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"></g><g id="SVGRepo_iconCarrier"> <path d="M14.4376 15.3703L12.3042 19.5292C11.9326 20.2537 10.8971 20.254 10.525 19.5297L4.24059 7.2971C3.81571 6.47007 4.65077 5.56156 5.51061 5.91537L18.5216 11.2692C19.2984 11.5889 19.3588 12.6658 18.6227 13.0704L14.4376 15.3703ZM14.4376 15.3703L5.09594 6.90886" stroke="#000000" strokeWidth="2" strokeLinecap="round"></path> </g></svg>
           </button>
         </div>
 
