@@ -9,14 +9,16 @@ const Sidebar = ({
   onDeleteConversation 
 }) => {
   return (
-    <div className="w-72 bg-white border-r shadow-sm flex flex-col">
-      <div className="p-4 border-b flex items-center justify-between">
-        <div className="font-bold text-blue-600 text-lg">My Chats</div>
+    <div className="w-64 bg-[#202123] flex flex-col h-screen border-r border-gray-700">
+      <div className="p-3">
         <button 
           onClick={onNewConversation} 
-          className="p-2 bg-blue-100 hover:bg-blue-200 rounded-full text-blue-600"
+          className="w-full flex items-center justify-center gap-3 p-3 rounded-lg border border-gray-600 hover:bg-gray-700 text-white transition-colors duration-200"
         >
-          +
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+          <span className="text-sm">New chat</span>
         </button>
       </div>
       <ConversationList

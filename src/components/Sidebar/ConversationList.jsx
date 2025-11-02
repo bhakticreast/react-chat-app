@@ -8,7 +8,7 @@ const ConversationList = ({
   onDeleteConversation 
 }) => {
   return (
-    <div className="flex-1 overflow-y-auto">
+    <div className="flex-1 overflow-y-auto scrollbar-thin py-2">
       {conversations.map(conv => (
         <ConversationItem
           key={conv.id}
