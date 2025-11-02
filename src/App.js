@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import ReactMarkdown from 'react-markdown';
 import { createClient } from '@supabase/supabase-js';
 import './App.css';
-import { useDropzone } from 'react-dropzone'; // Add this import
-import { sendChatMessage, geminiEditImage } from './services/Api';
-
 // Initialize Supabase client
 const supabase = createClient(
   process.env.REACT_APP_SUPABASE_URL,
@@ -19,11 +17,6 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [lastRequestTime, setLastRequestTime] = useState(0);
   const RATE_LIMIT_COOLDOWN = 20000;
-
-  // New state for image editing
-  const [uploadedImage, setUploadedImage] = useState(null);
-  const [editPrompt, setEditPrompt] = useState('');
-  const [editingImage, setEditingImage] = useState(false);
 
   // Load all conversations on mount
   useEffect(() => {
@@ -148,17 +141,31 @@ function App() {
 
     try {
       // Send full conversation history for context
-      const botContent = await sendChatMessage({
-        model: 'sonar',
-        messages: updatedMessages,
-        max_tokens: 500,
-        temperature: 0.7,
-        apiKey: process.env.REACT_APP_OPENAI_API_KEY
-      });
+      const response = await axios.post(
+        'https://api.perplexity.ai/chat/completions',
+        {
+          model: 'sonar',
+          messages: [
+            {
+              role: 'system',
+              content: 'You are a helpful, friendly AI assistant. Respond naturally to greetings and casual conversation. When users ask specific questions, provide informative answers based on current information.'
+            },
+            ...updatedMessages
+          ],
+          max_tokens: 500,
+          temperature: 0.7,
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${process.env.REACT_APP_OPENAI_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
 
       const botMessage = {
         role: 'assistant',
-        content: botContent 
+        content: response.data.choices[0].message.content
       };
 
       setMessages(prev => [...prev, botMessage]);
@@ -194,57 +201,6 @@ function App() {
       console.error('Error deleting conversation:', error);
     }
   };
-
-  // const editImage = async () => {
-  //   if (!uploadedImage || !editPrompt.trim()) return;
-  
-  //   setEditingImage(true);
-  //   const formData = new FormData();
-  //   formData.append('prompt', editPrompt);
-  //   formData.append('init_image', uploadedImage); // Uploaded image for editing
-  //   formData.append('init_image_mode', 'IMAGE_STRENGTH'); // Mode for edits
-  //   formData.append('image_strength', 0.35); // Lower for more original preservation (0-1)
-  //   formData.append('output_format', 'png');
-  //   formData.append('model', 'sd3-medium'); // Free-tier model
-  
-  //   try {
-  //     const response = await axios.post(
-  //      'https://api.stability.ai/v2beta/stable-image/generate/ultra',
-  //       formData,
-  //       {
-  //         headers: {
-  //           'Authorization': `Bearer ${process.env.REACT_APP_STABILITY_API_KEY}`,
-  //           'Accept': 'application/json',
-  //         },
-  //       }
-  //     );
-  
-  //     const editedImageUrl = response.data.artifacts[0].url;
-  //     const imageMessage = `Edited Image: <img src="${editedImageUrl}" alt="Edited" style="max-width: 100%;" />`;
-  //     setMessages(prev => [...prev, { role: 'assistant', content: imageMessage }]);
-  //     await saveMessage(currentConversationId, 'assistant', imageMessage);
-  //     setUploadedImage(null);
-  //     setEditPrompt('');
-  //   } catch (error) {
-  //     console.error('Image Edit Error:', error);
-  //     const errorMessage = `Image editing failed: ${error.response?.data?.message || 'Check API key or free tier limits.'}`;
-  //     setMessages(prev => [...prev, { role: 'assistant', content: errorMessage }]);
-  //   } finally {
-  //     setEditingImage(false);
-  //   }
-  // };
-  
-
-  // Dropzone for image upload
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    accept: 'image/*',
-    onDrop: (acceptedFiles) => {
-      const file = acceptedFiles[0];
-      if (file) {
-        setUploadedImage(file);
-      }
-    },
-  });
 
   return (
     <div className="flex h-screen bg-gray-100">
@@ -304,42 +260,9 @@ function App() {
             disabled={loading || !currentConversationId}
             title="Send"
           >
-            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" transform="rotate(-45)matrix(-1, 0, 0, -1, 0, 0)"><g id="SVGRepo_bgCarrier" strokeWidth="0"></g><g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"></g><g id="SVGRepo_iconCarrier"> <path d="M14.4376 15.3703L12.3042 19.5292C11.9326 20.2537 10.8971 20.254 10.525 19.5297L4.24059 7.2971C3.81571 6.47007 4.65077 5.56156 5.51061 5.91537L18.5216 11.2692C19.2984 11.5889 19.3588 12.6658 18.6227 13.0704L14.4376 15.3703ZM14.4376 15.3703L5.09594 6.90886" stroke="#000000" strokeWidth="2" strokeLinecap="round"></path> </g></svg>
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" transform="rotate(-45)matrix(-1, 0, 0, -1, 0, 0)"><g id="SVGRepo_bgCarrier" stroke-width="0"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g><g id="SVGRepo_iconCarrier"> <path d="M14.4376 15.3703L12.3042 19.5292C11.9326 20.2537 10.8971 20.254 10.525 19.5297L4.24059 7.2971C3.81571 6.47007 4.65077 5.56156 5.51061 5.91537L18.5216 11.2692C19.2984 11.5889 19.3588 12.6658 18.6227 13.0704L14.4376 15.3703ZM14.4376 15.3703L5.09594 6.90886" stroke="#000000" stroke-width="2" stroke-linecap="round"></path> </g></svg>
           </button>
         </div>
-
-        {/* Nano Banana AI Image Editor Section */}
-        {/* <div className="border-t pt-3">
-            <h4 className="font-semibold mb-2">Nano Banana AI Image Editor</h4>
-            <div {...getRootProps()} className="border-2 border-dashed border-gray-300 p-3 text-center cursor-pointer mb-2 rounded">
-              <input {...getInputProps()} />
-              {isDragActive ? (
-                <p>Drop the image here...</p>
-              ) : (
-                <p>Drag & drop an image here, or click to select</p>
-              )}
-            </div>
-            {uploadedImage && (
-              <div className="mb-2">
-                <img src={URL.createObjectURL(uploadedImage)} alt="Uploaded" className="max-w-full h-32 object-cover rounded" />
-              </div>
-            )}
-            <input
-              type="text"
-              value={editPrompt}
-              onChange={(e) => setEditPrompt(e.target.value)}
-              className="w-full p-2 border rounded mb-2"
-              placeholder="Describe the edit (e.g., 'Make it black and white')"
-            />
-            <button
-              onClick={editImage}
-              className="w-full bg-green-500 hover:bg-green-700 text-white p-2 rounded"
-              disabled={editingImage || !uploadedImage || !editPrompt.trim()}  // Removed !currentConversationId for testing
-
-            >
-              Edit Image
-            </button>
-          </div> */}
 
       </div>
     </div>
